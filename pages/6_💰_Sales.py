@@ -8,7 +8,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.db_manager import DatabaseManager
-from utils.helpers import show_success, show_error, format_currency, paginate_data, filter_data, format_date
+from utils.helpers import show_success, show_error, format_currency, paginate_data, filter_data, format_date, searchable_selectbox
 
 st.set_page_config(
     page_title="Sales - Book Inventory",
@@ -211,13 +211,28 @@ elif action == "Create New Sale":
     # Customer selection
     st.markdown("#### 👤 Customer Information")
     
-    customer_options = {"Walk-in Customer": None}
-    if customers:
-        customer_options.update({f"{cust['name']} - {cust.get('phone', 'No Phone')}": cust['id'] for cust in customers})
+    customer_options = ["Walk-in Customer"]
+    customer_mapping = {"Walk-in Customer": None}
     
-    selected_customer_key = st.selectbox("Select Customer", list(customer_options.keys()))
-    customer_id = customer_options[selected_customer_key]
-    st.session_state.sale_customer_id = customer_id
+    if customers:
+        for cust in customers:
+            option_text = f"{cust['name']} - {cust.get('phone', 'No Phone')}"
+            customer_options.append(option_text)
+            customer_mapping[option_text] = cust['id']
+    
+    selected_customer_key = searchable_selectbox(
+        "Customer", 
+        customer_options, 
+        key="sale_customer_select",
+        placeholder="Search customers by name or phone..."
+    )
+    
+    if selected_customer_key:
+        customer_id = customer_mapping[selected_customer_key]
+        st.session_state.sale_customer_id = customer_id
+    else:
+        customer_id = None
+        st.session_state.sale_customer_id = None
     
     if customer_id is None:
         st.info("💡 This is a walk-in sale. Customer details will not be recorded.")
@@ -234,19 +249,43 @@ elif action == "Create New Sale":
         if not available_books:
             st.warning("⚠️ No books with available stock.")
         else:
-            book_options = {f"{book['name']} - {book.get('author', 'Unknown')} (Stock: {book.get('stock_quantity', 0) - book.get('damaged_quantity', 0) - book.get('lost_quantity', 0)})": book['id'] for book in available_books}
-            selected_book_key = st.selectbox("Select Book", list(book_options.keys()))
-            book_id = book_options[selected_book_key]
+            book_options = []
+            book_mapping = {}
+            
+            for book in available_books:
+                available_stock = book.get('stock_quantity', 0) - book.get('damaged_quantity', 0) - book.get('lost_quantity', 0)
+                option_text = f"{book['name']} - {book.get('author', 'Unknown')} (Stock: {available_stock})"
+                book_options.append(option_text)
+                book_mapping[option_text] = book['id']
+            
+            selected_book_key = searchable_selectbox(
+                "Book", 
+                book_options, 
+                key="sale_book_select",
+                placeholder="Search books by name, author..."
+            )
+            
+            if selected_book_key:
+                book_id = book_mapping[selected_book_key]
+            else:
+                book_id = None
     
     with col2:
-        if available_books:
-            selected_book = next(book for book in available_books if book['id'] == book_id)
-            max_qty = selected_book.get('stock_quantity', 0) - selected_book.get('damaged_quantity', 0) - selected_book.get('lost_quantity', 0)
-            quantity = st.number_input("Quantity", min_value=1, max_value=max_qty, value=1)
+        if available_books and book_id:
+            selected_book = next((book for book in available_books if book['id'] == book_id), None)
+            if selected_book:
+                max_qty = selected_book.get('stock_quantity', 0) - selected_book.get('damaged_quantity', 0) - selected_book.get('lost_quantity', 0)
+                quantity = st.number_input("Quantity", min_value=1, max_value=max_qty, value=1)
+            else:
+                quantity = 1
+        else:
+            quantity = 1
     
     with col3:
-        if available_books:
+        if available_books and book_id and selected_book:
             price = st.number_input("Price", min_value=0.01, value=float(selected_book.get('selling_price', 0)), step=0.01)
+        else:
+            price = st.number_input("Price", min_value=0.01, value=0.01, step=0.01)
     
     with col4:
         if available_books and st.button("🛒 Add to Cart", use_container_width=True):

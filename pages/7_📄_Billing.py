@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.db_manager import DatabaseManager
 from utils.pdf_generator import PDFInvoiceGenerator
-from utils.helpers import show_success, show_error, format_currency, format_date, create_download_link
+from utils.helpers import show_success, show_error, format_currency, format_date, create_download_link, searchable_selectbox
 
 st.set_page_config(
     page_title="Billing - Book Inventory",
@@ -109,10 +109,27 @@ if action == "Generate Invoice":
                 st.switch_page("pages/6_💰_Sales.py")
             st.stop()
         
-        # Sale selection
-        sale_options = {f"{sale['invoice_no']} - {sale.get('customer_name', 'Walk-in')} - {format_currency(sale['final_amount'])}": sale['id'] for sale in all_sales}
-        selected_sale_key = st.selectbox("Select Sale for Invoice", list(sale_options.keys()))
-        sale_id = sale_options[selected_sale_key]
+        # Sale selection with searchable dropdown
+        sale_options = []
+        sale_mapping = {}
+        
+        for sale in all_sales:
+            option_text = f"{sale['invoice_no']} - {sale.get('customer_name', 'Walk-in')} - {format_currency(sale['final_amount'])}"
+            sale_options.append(option_text)
+            sale_mapping[option_text] = sale['id']
+        
+        selected_sale_key = searchable_selectbox(
+            "Sale for Invoice", 
+            sale_options,
+            key="billing_sale_select",
+            placeholder="Search by invoice number or customer name..."
+        )
+        
+        if selected_sale_key:
+            sale_id = sale_mapping[selected_sale_key]
+        else:
+            st.warning("Please select a sale to generate invoice.")
+            st.stop()
     
     # Get sale details
     sale_details = db.get_sale_details(sale_id)
