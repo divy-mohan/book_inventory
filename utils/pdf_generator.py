@@ -83,7 +83,7 @@ class PDFInvoiceGenerator:
             fontName=self.unicode_font
         ))
     
-    def generate_invoice(self, invoice_data: Dict[str, Any], filename: str = None) -> str:
+    def generate_invoice(self, invoice_data: Dict[str, Any], filename: str = "") -> str:
         """Generate PDF invoice and return the filename"""
         if not filename:
             filename = f"invoice_{invoice_data['sale']['invoice_no']}.pdf"
@@ -250,7 +250,7 @@ class PDFInvoiceGenerator:
         doc.build(story)
         return filepath
     
-    def generate_report_pdf(self, report_data: Dict[str, Any], filename: str = None) -> str:
+    def generate_report_pdf(self, report_data: Dict[str, Any], filename: str = "") -> str:
         """Generate PDF report and return the filename"""
         if not filename:
             filename = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"

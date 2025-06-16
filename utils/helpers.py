@@ -49,7 +49,7 @@ def show_info(message: str):
     """Show info message"""
     st.info(f"ℹ️ {message}")
 
-def create_download_link(file_path: str, file_name: str = None):
+def create_download_link(file_path: str, file_name: str = ""):
     """Create download link for file"""
     if not file_name:
         file_name = file_path.split('/')[-1]
@@ -118,7 +118,7 @@ def filter_data(data: List[Dict], search_term: str, search_fields: List[str]) ->
     
     return filtered_data
 
-def export_to_csv(data: List[Dict], filename: str = None) -> bytes:
+def export_to_csv(data: List[Dict], filename: str = "") -> bytes:
     """Export data to CSV"""
     if not filename:
         filename = f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -161,7 +161,7 @@ def get_low_stock_books(books: List[Dict], threshold: int = 5) -> List[Dict]:
     
     return low_stock_books
 
-def searchable_selectbox(label: str, options: List[str], key: str = None, placeholder: str = "Type to search...") -> Optional[str]:
+def searchable_selectbox(label: str, options: List[str], key: str = "", placeholder: str = "Type to search...") -> Optional[str]:
     """Create a searchable selectbox with filtering"""
     if not options:
         st.warning(f"No options available for {label}")
@@ -182,11 +182,11 @@ def searchable_selectbox(label: str, options: List[str], key: str = None, placeh
     
     # Show selectbox with filtered options
     if filtered_options:
-        return st.selectbox(f"Select {label}", filtered_options, key=key)
+        return st.selectbox(f"Select {label}", filtered_options, key=key if key else None)
     
     return None
 
-def searchable_multiselect(label: str, options: List[str], default: List[str] = None, key: str = None, placeholder: str = "Type to search...") -> List[str]:
+def searchable_multiselect(label: str, options: List[str], default: List[str] = [], key: str = "", placeholder: str = "Type to search...") -> List[str]:
     """Create a searchable multiselect with filtering"""
     if not options:
         st.warning(f"No options available for {label}")
@@ -204,7 +204,7 @@ def searchable_multiselect(label: str, options: List[str], default: List[str] = 
     
     # Show multiselect with filtered options
     if filtered_options:
-        return st.multiselect(f"Select {label}", filtered_options, default=default or [], key=key)
+        return st.multiselect(f"Select {label}", filtered_options, default=default, key=key if key else None)
     
     return []
 
