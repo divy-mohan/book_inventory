@@ -4,6 +4,8 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from datetime import datetime
 import os
 from typing import Dict, List, Any
@@ -11,7 +13,28 @@ from typing import Dict, List, Any
 class PDFInvoiceGenerator:
     def __init__(self):
         self.styles = getSampleStyleSheet()
+        self.setup_fonts()
         self.setup_custom_styles()
+    
+    def setup_fonts(self):
+        """Setup fonts for Hindi/Unicode support"""
+        try:
+            # Try to register a Unicode-compatible font
+            # Use DejaVu Sans which supports Hindi characters
+            font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+            if os.path.exists(font_path):
+                pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
+                pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"))
+                self.unicode_font = 'DejaVuSans'
+                self.unicode_font_bold = 'DejaVuSans-Bold'
+            else:
+                # Fallback to default fonts
+                self.unicode_font = 'Helvetica'
+                self.unicode_font_bold = 'Helvetica-Bold'
+        except Exception as e:
+            print(f"Font setup warning: {e}")
+            self.unicode_font = 'Helvetica'
+            self.unicode_font_bold = 'Helvetica-Bold'
     
     def setup_custom_styles(self):
         """Setup custom paragraph styles"""
@@ -21,7 +44,8 @@ class PDFInvoiceGenerator:
             fontSize=18,
             spaceAfter=6,
             textColor=colors.darkblue,
-            alignment=1  # Center alignment
+            alignment=1,  # Center alignment
+            fontName=self.unicode_font_bold
         ))
         
         self.styles.add(ParagraphStyle(
@@ -30,7 +54,8 @@ class PDFInvoiceGenerator:
             fontSize=16,
             spaceAfter=12,
             textColor=colors.darkred,
-            alignment=1
+            alignment=1,
+            fontName=self.unicode_font_bold
         ))
         
         self.styles.add(ParagraphStyle(
@@ -38,7 +63,8 @@ class PDFInvoiceGenerator:
             parent=self.styles['Normal'],
             fontSize=10,
             spaceAfter=3,
-            alignment=1
+            alignment=1,
+            fontName=self.unicode_font
         ))
         
         self.styles.add(ParagraphStyle(
@@ -46,7 +72,15 @@ class PDFInvoiceGenerator:
             parent=self.styles['Heading3'],
             fontSize=12,
             spaceAfter=6,
-            textColor=colors.darkblue
+            textColor=colors.darkblue,
+            fontName=self.unicode_font_bold
+        ))
+        
+        self.styles.add(ParagraphStyle(
+            name='UnicodeNormal',
+            parent=self.styles['Normal'],
+            fontSize=10,
+            fontName=self.unicode_font
         ))
     
     def generate_invoice(self, invoice_data: Dict[str, Any], filename: str = None) -> str:
@@ -153,7 +187,8 @@ class PDFInvoiceGenerator:
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('ALIGN', (1, 1), (2, -1), 'LEFT'),  # Left align book name and author
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (0, 0), (-1, 0), self.unicode_font_bold),
+            ('FONTNAME', (0, 1), (-1, -1), self.unicode_font),  # Use Unicode font for content
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),

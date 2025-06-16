@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime, date
 import pandas as pd
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 def init_session_state():
     """Initialize session state variables"""
@@ -160,6 +160,53 @@ def get_low_stock_books(books: List[Dict], threshold: int = 5) -> List[Dict]:
             })
     
     return low_stock_books
+
+def searchable_selectbox(label: str, options: List[str], key: str = None, placeholder: str = "Type to search...") -> Optional[str]:
+    """Create a searchable selectbox with filtering"""
+    if not options:
+        st.warning(f"No options available for {label}")
+        return None
+    
+    # Create search input
+    search_key = f"{key}_search" if key else f"{label.lower().replace(' ', '_')}_search"
+    search_term = st.text_input(f"🔍 Search {label}", placeholder=placeholder, key=search_key)
+    
+    # Filter options based on search
+    if search_term:
+        filtered_options = [opt for opt in options if search_term.lower() in opt.lower()]
+        if not filtered_options:
+            st.warning(f"No {label.lower()} found matching '{search_term}'")
+            return None
+    else:
+        filtered_options = options
+    
+    # Show selectbox with filtered options
+    if filtered_options:
+        return st.selectbox(f"Select {label}", filtered_options, key=key)
+    
+    return None
+
+def searchable_multiselect(label: str, options: List[str], default: List[str] = None, key: str = None, placeholder: str = "Type to search...") -> List[str]:
+    """Create a searchable multiselect with filtering"""
+    if not options:
+        st.warning(f"No options available for {label}")
+        return []
+    
+    # Create search input
+    search_key = f"{key}_search" if key else f"{label.lower().replace(' ', '_')}_search"
+    search_term = st.text_input(f"🔍 Search {label}", placeholder=placeholder, key=search_key)
+    
+    # Filter options based on search
+    if search_term:
+        filtered_options = [opt for opt in options if search_term.lower() in opt.lower()]
+    else:
+        filtered_options = options
+    
+    # Show multiselect with filtered options
+    if filtered_options:
+        return st.multiselect(f"Select {label}", filtered_options, default=default or [], key=key)
+    
+    return []
 
 def generate_dashboard_metrics(db):
     """Generate metrics for dashboard"""
