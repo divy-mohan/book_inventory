@@ -19,18 +19,27 @@ class PDFInvoiceGenerator:
     def setup_fonts(self):
         """Setup fonts for Hindi/Unicode support"""
         try:
-            # Try to register a Unicode-compatible font
-            # Use DejaVu Sans which supports Hindi characters
-            font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-            if os.path.exists(font_path):
-                pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
-                pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"))
-                self.unicode_font = 'DejaVuSans'
-                self.unicode_font_bold = 'DejaVuSans-Bold'
+            # Try to register our downloaded Noto Devanagari font for Hindi support
+            noto_font_path = "fonts/NotoSansDevanagari-Regular.ttf"
+            if os.path.exists(noto_font_path):
+                pdfmetrics.registerFont(TTFont('NotoDevanagari', noto_font_path))
+                self.unicode_font = 'NotoDevanagari'
+                self.unicode_font_bold = 'NotoDevanagari'
+                print("Successfully loaded Noto Devanagari font for Hindi support")
             else:
-                # Fallback to default fonts
-                self.unicode_font = 'Helvetica'
-                self.unicode_font_bold = 'Helvetica-Bold'
+                # Try DejaVu Sans as fallback
+                font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+                if os.path.exists(font_path):
+                    pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
+                    pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"))
+                    self.unicode_font = 'DejaVuSans'
+                    self.unicode_font_bold = 'DejaVuSans-Bold'
+                    print("Using DejaVu Sans for Unicode support")
+                else:
+                    # Final fallback to default fonts
+                    self.unicode_font = 'Helvetica'
+                    self.unicode_font_bold = 'Helvetica-Bold'
+                    print("Using Helvetica fallback fonts")
         except Exception as e:
             print(f"Font setup warning: {e}")
             self.unicode_font = 'Helvetica'
