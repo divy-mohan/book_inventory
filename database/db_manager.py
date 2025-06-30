@@ -1,55 +1,34 @@
-import sqlite3
-import os
+from psycopg2.extras import RealDictCursor
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+import traceback  # Add this at the top of your file
 
 class DatabaseManager:
-    def __init__(self, db_path: str = "inventory_system.db"):
-        self.db_path = db_path
-        self.ensure_database_exists()
-    
-    def ensure_database_exists(self):
-        """Ensure the database file exists and is accessible"""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute("SELECT 1")
-        except Exception as e:
-            print(f"Database initialization error: {e}")
-    
+    def __init__(self, conn_str):
+        self.conn_str = conn_str
+
     def get_connection(self):
-        """Get database connection with proper configuration"""
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        return conn
-    
-    def execute_query(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
-        """Execute a SELECT query and return results as list of dictionaries"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.execute(query, params)
-                columns = [description[0] for description in cursor.description]
-                return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as e:
-            print(f"Query execution error: {e}")
-            return []
-    
-    def execute_update(self, query: str, params: tuple = ()) -> bool:
-        """Execute INSERT, UPDATE, or DELETE query"""
-        try:
-            with self.get_connection() as conn:
-                conn.execute(query, params)
+        import psycopg2
+        return psycopg2.connect(self.conn_str, cursor_factory=RealDictCursor)
+
+    def execute_query(self, query, params=None):
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params or ())
+                return cur.fetchall()
+
+    def execute_update(self, query, params=None):
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params or ())
                 conn.commit()
                 return True
-        except Exception as e:
-            print(f"Update execution error: {e}")
-            return False
-    
+
     def create_tables(self):
         """Create all necessary tables"""
         tables = [
-            # Companies table
             '''CREATE TABLE IF NOT EXISTS companies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
                 registration_no TEXT,
                 address TEXT,
@@ -58,10 +37,8 @@ class DatabaseManager:
                 gst_no TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )''',
-            
-            # Books table
             '''CREATE TABLE IF NOT EXISTS books (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 company_id INTEGER,
                 name TEXT NOT NULL,
                 author TEXT,
@@ -76,10 +53,8 @@ class DatabaseManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (company_id) REFERENCES companies (id)
             )''',
-            
-            # Customers table
             '''CREATE TABLE IF NOT EXISTS customers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 company_id INTEGER,
                 name TEXT NOT NULL,
                 phone TEXT,
@@ -89,10 +64,8 @@ class DatabaseManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (company_id) REFERENCES companies (id)
             )''',
-            
-            # Purchases table
             '''CREATE TABLE IF NOT EXISTS purchases (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 company_id INTEGER,
                 book_id INTEGER,
                 supplier_name TEXT,
@@ -105,10 +78,8 @@ class DatabaseManager:
                 FOREIGN KEY (company_id) REFERENCES companies (id),
                 FOREIGN KEY (book_id) REFERENCES books (id)
             )''',
-            
-            # Sales table
             '''CREATE TABLE IF NOT EXISTS sales (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 company_id INTEGER,
                 customer_id INTEGER,
                 invoice_no TEXT UNIQUE,
@@ -123,10 +94,8 @@ class DatabaseManager:
                 FOREIGN KEY (company_id) REFERENCES companies (id),
                 FOREIGN KEY (customer_id) REFERENCES customers (id)
             )''',
-            
-            # Sale items table
             '''CREATE TABLE IF NOT EXISTS sale_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 sale_id INTEGER,
                 book_id INTEGER,
                 quantity INTEGER NOT NULL,
@@ -135,28 +104,25 @@ class DatabaseManager:
                 FOREIGN KEY (sale_id) REFERENCES sales (id),
                 FOREIGN KEY (book_id) REFERENCES books (id)
             )''',
-            
-            # Stock movements table
             '''CREATE TABLE IF NOT EXISTS stock_movements (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 book_id INTEGER,
-                movement_type TEXT NOT NULL, -- 'IN', 'OUT', 'DAMAGED', 'LOST'
+                movement_type TEXT NOT NULL,
                 quantity INTEGER NOT NULL,
-                reference_type TEXT, -- 'PURCHASE', 'SALE', 'ADJUSTMENT'
+                reference_type TEXT,
                 reference_id INTEGER,
                 notes TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (book_id) REFERENCES books (id)
             )'''
         ]
-        
         for table_sql in tables:
             self.execute_update(table_sql)
-    
+
     # Company methods
     def add_company(self, company_data: Dict[str, Any]) -> bool:
         query = '''INSERT INTO companies (name, registration_no, address, phone, email, gst_no)
-                   VALUES (?, ?, ?, ?, ?, ?)'''
+                   VALUES (%s, %s, %s, %s, %s, %s)'''
         params = (
             company_data['name'],
             company_data.get('registration_no', ''),
@@ -166,17 +132,17 @@ class DatabaseManager:
             company_data.get('gst_no', '')
         )
         return self.execute_update(query, params)
-    
+
     def get_all_companies(self) -> List[Dict[str, Any]]:
         return self.execute_query("SELECT * FROM companies ORDER BY name")
-    
+
     def get_company_by_id(self, company_id: int) -> Optional[Dict[str, Any]]:
-        result = self.execute_query("SELECT * FROM companies WHERE id = ?", (company_id,))
+        result = self.execute_query("SELECT * FROM companies WHERE id = %s", (company_id,))
         return result[0] if result else None
-    
+
     def update_company(self, company_id: int, company_data: Dict[str, Any]) -> bool:
-        query = '''UPDATE companies SET name = ?, registration_no = ?, address = ?, 
-                   phone = ?, email = ?, gst_no = ? WHERE id = ?'''
+        query = '''UPDATE companies SET name = %s, registration_no = %s, address = %s, 
+                   phone = %s, email = %s, gst_no = %s WHERE id = %s'''
         params = (
             company_data['name'],
             company_data.get('registration_no', ''),
@@ -187,15 +153,15 @@ class DatabaseManager:
             company_id
         )
         return self.execute_update(query, params)
-    
+
     def delete_company(self, company_id: int) -> bool:
-        return self.execute_update("DELETE FROM companies WHERE id = ?", (company_id,))
-    
+        return self.execute_update("DELETE FROM companies WHERE id = %s", (company_id,))
+
     # Book methods
     def add_book(self, book_data: Dict[str, Any]) -> bool:
         query = '''INSERT INTO books (company_id, name, author, category, language, isbn,
                    purchase_price, selling_price, stock_quantity)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'''
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)'''
         params = (
             book_data['company_id'],
             book_data['name'],
@@ -208,26 +174,26 @@ class DatabaseManager:
             book_data.get('stock_quantity', 0)
         )
         return self.execute_update(query, params)
-    
+
     def get_books_by_company(self, company_id: int) -> List[Dict[str, Any]]:
         query = '''SELECT b.*, c.name as company_name FROM books b
                    JOIN companies c ON b.company_id = c.id
-                   WHERE b.company_id = ? ORDER BY b.name'''
+                   WHERE b.company_id = %s ORDER BY b.name'''
         return self.execute_query(query, (company_id,))
-    
+
     def get_all_books(self) -> List[Dict[str, Any]]:
         query = '''SELECT b.*, c.name as company_name FROM books b
                    JOIN companies c ON b.company_id = c.id ORDER BY b.name'''
         return self.execute_query(query)
-    
+
     def get_book_by_id(self, book_id: int) -> Optional[Dict[str, Any]]:
-        result = self.execute_query("SELECT * FROM books WHERE id = ?", (book_id,))
+        result = self.execute_query("SELECT * FROM books WHERE id = %s", (book_id,))
         return result[0] if result else None
-    
+
     def update_book(self, book_id: int, book_data: Dict[str, Any]) -> bool:
-        query = '''UPDATE books SET name = ?, author = ?, category = ?, language = ?,
-                   isbn = ?, purchase_price = ?, selling_price = ?, stock_quantity = ?
-                   WHERE id = ?'''
+        query = '''UPDATE books SET name = %s, author = %s, category = %s, language = %s,
+                   isbn = %s, purchase_price = %s, selling_price = %s, stock_quantity = %s
+                   WHERE id = %s'''
         params = (
             book_data['name'],
             book_data.get('author', ''),
@@ -240,27 +206,23 @@ class DatabaseManager:
             book_id
         )
         return self.execute_update(query, params)
-    
+
     def update_book_stock(self, book_id: int, quantity_change: int, movement_type: str = 'ADJUSTMENT') -> bool:
-        # Update stock quantity
-        query = "UPDATE books SET stock_quantity = stock_quantity + ? WHERE id = ?"
+        query = "UPDATE books SET stock_quantity = stock_quantity + %s WHERE id = %s"
         success = self.execute_update(query, (quantity_change, book_id))
-        
         if success:
-            # Record stock movement
             movement_query = '''INSERT INTO stock_movements (book_id, movement_type, quantity, reference_type)
-                               VALUES (?, ?, ?, ?)'''
+                                VALUES (%s, %s, %s, %s)'''
             self.execute_update(movement_query, (book_id, movement_type, abs(quantity_change), 'ADJUSTMENT'))
-        
         return success
-    
+
     def delete_book(self, book_id: int) -> bool:
-        return self.execute_update("DELETE FROM books WHERE id = ?", (book_id,))
-    
+        return self.execute_update("DELETE FROM books WHERE id = %s", (book_id,))
+
     # Customer methods
     def add_customer(self, customer_data: Dict[str, Any]) -> bool:
         query = '''INSERT INTO customers (company_id, name, phone, email, address, gst_no)
-                   VALUES (?, ?, ?, ?, ?, ?)'''
+                   VALUES (%s, %s, %s, %s, %s, %s)'''
         params = (
             customer_data['company_id'],
             customer_data['name'],
@@ -270,25 +232,25 @@ class DatabaseManager:
             customer_data.get('gst_no', '')
         )
         return self.execute_update(query, params)
-    
+
     def get_customers_by_company(self, company_id: int) -> List[Dict[str, Any]]:
         query = '''SELECT c.*, comp.name as company_name FROM customers c
                    JOIN companies comp ON c.company_id = comp.id
-                   WHERE c.company_id = ? ORDER BY c.name'''
+                   WHERE c.company_id = %s ORDER BY c.name'''
         return self.execute_query(query, (company_id,))
-    
+
     def get_all_customers(self) -> List[Dict[str, Any]]:
         query = '''SELECT c.*, comp.name as company_name FROM customers c
                    JOIN companies comp ON c.company_id = comp.id ORDER BY c.name'''
         return self.execute_query(query)
-    
+
     def get_customer_by_id(self, customer_id: int) -> Optional[Dict[str, Any]]:
-        result = self.execute_query("SELECT * FROM customers WHERE id = ?", (customer_id,))
+        result = self.execute_query("SELECT * FROM customers WHERE id = %s", (customer_id,))
         return result[0] if result else None
-    
+
     def update_customer(self, customer_id: int, customer_data: Dict[str, Any]) -> bool:
-        query = '''UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, gst_no = ?
-                   WHERE id = ?'''
+        query = '''UPDATE customers SET name = %s, phone = %s, email = %s, address = %s, gst_no = %s
+                   WHERE id = %s'''
         params = (
             customer_data['name'],
             customer_data.get('phone', ''),
@@ -298,15 +260,15 @@ class DatabaseManager:
             customer_id
         )
         return self.execute_update(query, params)
-    
+
     def delete_customer(self, customer_id: int) -> bool:
-        return self.execute_update("DELETE FROM customers WHERE id = ?", (customer_id,))
-    
+        return self.execute_update("DELETE FROM customers WHERE id = %s", (customer_id,))
+
     # Purchase methods
     def add_purchase(self, purchase_data: Dict[str, Any]) -> bool:
         query = '''INSERT INTO purchases (company_id, book_id, supplier_name, quantity,
                    price_per_unit, total_amount, purchase_date, notes)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)'''
         params = (
             purchase_data['company_id'],
             purchase_data['book_id'],
@@ -317,107 +279,110 @@ class DatabaseManager:
             purchase_data.get('purchase_date', datetime.now().date()),
             purchase_data.get('notes', '')
         )
-        
         success = self.execute_update(query, params)
         if success:
-            # Update book stock
             self.update_book_stock(purchase_data['book_id'], purchase_data['quantity'], 'IN')
-        
         return success
-    
+
     def get_purchases_by_company(self, company_id: int) -> List[Dict[str, Any]]:
         query = '''SELECT p.*, b.name as book_name, b.author, c.name as company_name
                    FROM purchases p
                    JOIN books b ON p.book_id = b.id
                    JOIN companies c ON p.company_id = c.id
-                   WHERE p.company_id = ? ORDER BY p.purchase_date DESC'''
+                   WHERE p.company_id = %s ORDER BY p.purchase_date DESC'''
         return self.execute_query(query, (company_id,))
-    
+
+    def get_latest_purchase_price(self, book_id: int) -> float:
+        query = '''
+            SELECT price_per_unit FROM purchases
+            WHERE book_id = %s
+            ORDER BY purchase_date DESC, id DESC
+            LIMIT 1
+        '''
+        result = self.execute_query(query, (book_id,))
+        return result[0]['price_per_unit'] if result else 0.0
+
     # Sale methods
     def add_sale(self, sale_data: Dict[str, Any], sale_items: List[Dict[str, Any]]) -> bool:
         try:
             with self.get_connection() as conn:
-                # Insert sale record
-                sale_query = '''INSERT INTO sales (company_id, customer_id, invoice_no, sale_date,
-                               total_amount, discount, tax_amount, final_amount, payment_status, notes)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'''
-                sale_params = (
-                    sale_data['company_id'],
-                    sale_data.get('customer_id'),
-                    sale_data['invoice_no'],
-                    sale_data.get('sale_date', datetime.now().date()),
-                    sale_data['total_amount'],
-                    sale_data.get('discount', 0),
-                    sale_data.get('tax_amount', 0),
-                    sale_data['final_amount'],
-                    sale_data.get('payment_status', 'Completed'),
-                    sale_data.get('notes', '')
-                )
-                
-                cursor = conn.execute(sale_query, sale_params)
-                sale_id = cursor.lastrowid
-                
-                # Insert sale items and update stock
-                for item in sale_items:
-                    item_query = '''INSERT INTO sale_items (sale_id, book_id, quantity, price_per_unit, total_price)
-                                   VALUES (?, ?, ?, ?, ?)'''
-                    item_params = (
-                        sale_id,
-                        item['book_id'],
-                        item['quantity'],
-                        item['price_per_unit'],
-                        item['total_price']
+                with conn.cursor() as cursor:
+                    # Insert sale record
+                    sale_query = '''INSERT INTO sales (company_id, customer_id, invoice_no, sale_date,
+                                   total_amount, discount, tax_amount, final_amount, payment_status, notes)
+                                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id'''
+                    sale_params = (
+                        sale_data['company_id'],
+                        sale_data.get('customer_id'),
+                        sale_data['invoice_no'],
+                        sale_data.get('sale_date', datetime.now().date()),
+                        sale_data['total_amount'],
+                        sale_data.get('discount', 0),
+                        sale_data.get('tax_amount', 0),
+                        sale_data['final_amount'],
+                        sale_data.get('payment_status', 'Completed'),
+                        sale_data.get('notes', '')
                     )
-                    conn.execute(item_query, item_params)
-                    
-                    # Update book stock
-                    stock_query = "UPDATE books SET stock_quantity = stock_quantity - ? WHERE id = ?"
-                    conn.execute(stock_query, (item['quantity'], item['book_id']))
-                    
-                    # Record stock movement
-                    movement_query = '''INSERT INTO stock_movements (book_id, movement_type, quantity,
-                                       reference_type, reference_id) VALUES (?, ?, ?, ?, ?)'''
-                    conn.execute(movement_query, (item['book_id'], 'OUT', item['quantity'], 'SALE', sale_id))
-                
-                conn.commit()
-                return True
+                    cursor.execute(sale_query, sale_params)
+                    sale_id = cursor.fetchone()[0]
+
+                    # Insert sale items and update stock
+                    for item in sale_items:
+                        item_query = '''INSERT INTO sale_items (sale_id, book_id, quantity, price_per_unit, total_price)
+                                       VALUES (%s, %s, %s, %s, %s)'''
+                        item_params = (
+                            sale_id,
+                            item['book_id'],
+                            item['quantity'],
+                            item['price_per_unit'],
+                            item['total_price']
+                        )
+                        cursor.execute(item_query, item_params)
+
+                        # Update book stock
+                        stock_query = "UPDATE books SET stock_quantity = stock_quantity - %s WHERE id = %s"
+                        cursor.execute(stock_query, (item['quantity'], item['book_id']))
+
+                        # Record stock movement
+                        movement_query = '''INSERT INTO stock_movements (book_id, movement_type, quantity,
+                                       reference_type, reference_id) VALUES (%s, %s, %s, %s, %s)'''
+                        cursor.execute(movement_query, (item['book_id'], 'OUT', item['quantity'], 'SALE', sale_id))
+
+                    conn.commit()
+                    return True
         except Exception as e:
             print(f"Sale transaction error: {e}")
+            traceback.print_exc()
             return False
-    
+
     def get_sales_by_company(self, company_id: int) -> List[Dict[str, Any]]:
         query = '''SELECT s.*, c.name as customer_name, comp.name as company_name
                    FROM sales s
                    LEFT JOIN customers c ON s.customer_id = c.id
                    JOIN companies comp ON s.company_id = comp.id
-                   WHERE s.company_id = ? ORDER BY s.sale_date DESC'''
+                   WHERE s.company_id = %s ORDER BY s.sale_date DESC'''
         return self.execute_query(query, (company_id,))
-    
+
     def get_sale_details(self, sale_id: int) -> Dict[str, Any]:
-        # Get sale header
         sale_query = '''SELECT s.*, c.name as customer_name, c.phone as customer_phone,
                        c.address as customer_address, comp.name as company_name
                        FROM sales s
                        LEFT JOIN customers c ON s.customer_id = c.id
                        JOIN companies comp ON s.company_id = comp.id
-                       WHERE s.id = ?'''
+                       WHERE s.id = %s'''
         sale_result = self.execute_query(sale_query, (sale_id,))
-        
-        # Get sale items
         items_query = '''SELECT si.*, b.name as book_name, b.author
                         FROM sale_items si
                         JOIN books b ON si.book_id = b.id
-                        WHERE si.sale_id = ?'''
+                        WHERE si.sale_id = %s'''
         items_result = self.execute_query(items_query, (sale_id,))
-        
         return {
             'sale': sale_result[0] if sale_result else None,
             'items': items_result
         }
-    
+
     def generate_invoice_number(self, company_id: int) -> str:
-        """Generate unique invoice number"""
-        query = "SELECT COUNT(*) as count FROM sales WHERE company_id = ?"
+        query = "SELECT COUNT(*) as count FROM sales WHERE company_id = %s"
         result = self.execute_query(query, (company_id,))
         count = result[0]['count'] + 1
         return f"INV-{company_id:03d}-{count:06d}"

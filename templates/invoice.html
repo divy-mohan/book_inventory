@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice - {{ invoice_no }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #312e81;
+            --accent: #06b6d4;
+            --bg: #f8fafc;
+            --white: #fff;
+            --gray: #374151;
+            --border: #e5e7eb;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --shadow: 0 8px 32px rgba(79,70,229,0.10), 0 1.5px 8px rgba(6,182,212,0.08);
+        }
+        html, body {
+            height: 100%;
+        }
+
+        .invoice-number {
+            color: black;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(120deg, var(--primary) 0%, var(--accent) 100%);
+            color: var(--gray);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        .invoice-container {
+            background: var(--white);
+            padding: 28px 18px 22px 18px;
+            max-width: 700px;
+            margin: 32px auto 24px auto;
+            box-shadow: var(--shadow);
+            border-radius: 14px;
+            position: relative;
+            overflow: hidden;
+            border: 1.5px solid var(--border);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        .company {
+            line-height: 1.5;
+            font-size: 1em;
+        }
+        .company strong {
+            font-size: 1.25em;
+            color: var(--primary-dark);
+            letter-spacing: 1px;
+            font-weight: 800;
+        }
+        .invoice-title {
+            font-size: 1.7em;
+            color: var(--primary);
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-shadow: 0 2px 8px rgba(79,70,229,0.08);
+            text-align: right;
+        }
+        hr {
+            border: none;
+            border-top: 2px solid var(--primary);
+            margin: 10px 0 18px 0;
+        }
+        .customer, .invoice-info {
+            margin-bottom: 10px;
+            font-size: 0.98em;
+        }
+        .customer strong {
+            color: var(--primary-dark);
+            font-weight: 700;
+            font-size: 1em;
+        }
+        .invoice-info strong {
+            color: var(--primary-dark);
+            font-weight: 700;
+        }
+        .status {
+            margin-top: 8px;
+            background: linear-gradient(90deg, var(--accent) 0%, var(--primary) 100%);
+            padding: 5px 14px;
+            border-radius: 14px;
+            display: inline-block;
+            font-size: 0.95em;
+            color: var(--white);
+            font-weight: 700;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 8px rgba(6,182,212,0.08);
+        }
+        .print-btn {
+            background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+            color: var(--white);
+            padding: 8px 20px;
+            border: none;
+            border-radius: 7px;
+            font-size: 1em;
+            font-weight: 700;
+            cursor: pointer;
+            margin: 14px 0 10px 0;
+            box-shadow: 0 2px 8px rgba(79,70,229,0.10);
+            transition: background 0.2s, transform 0.2s;
+            float: right;
+        }
+        .print-btn:hover {
+            background: linear-gradient(90deg, var(--accent) 0%, var(--primary) 100%);
+            transform: translateY(-2px) scale(1.03);
+        }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 12px;
+            background: var(--white);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 6px rgba(79,70,229,0.04);
+        }
+        thead {
+            background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+        }
+        th, td {
+            padding: 8px 6px;
+            text-align: left;
+        }
+        th {
+            font-weight: 700;
+            color: var(--white);
+            font-size: 0.98em;
+            border-bottom: 2px solid var(--border);
+        }
+        td {
+            color: var(--gray);
+            font-size: 0.97em;
+            border-bottom: 1px solid var(--border);
+        }
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        tbody tr:hover {
+            background: #f1f5fd;
+        }
+        .totals {
+            margin-top: 12px;
+            width: 100%;
+            max-width: 260px;
+            float: right;
+            background: #f8fafc;
+            border-radius: 8px;
+            box-shadow: 0 1px 6px rgba(79,70,229,0.04);
+        }
+        .totals td, .totals th {
+            padding: 8px 10px;
+            font-size: 0.98em;
+        }
+        .totals tr:last-child th, .totals tr:last-child td {
+            font-size: 1.08em;
+            color: var(--primary-dark);
+            font-weight: 800;
+            border-top: 2px solid var(--primary);
+        }
+        .totals td.amount, .totals th.amount {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        .footer {
+            clear: both;
+            margin-top: 30px;
+            font-size: 0.98em;
+            color: var(--gray);
+            border-top: 1.5px solid var(--border);
+            padding-top: 12px;
+            background: linear-gradient(90deg, #f3f4f6 0%, #e0e7ef 100%);
+            border-radius: 0 0 8px 8px;
+        }
+        .footer p {
+            margin: 0 0 6px 0;
+        }
+        @media print {
+            body, html {
+                background: #fff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+            }
+            .invoice-container {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: #fff !important;
+                page-break-inside: avoid !important;
+            }
+            .footer {
+                background: none !important;
+            }
+            .back-btn, .print-btn {
+                display: none !important;
+            }
+            @page {
+                size: A4;
+                margin: 16mm 10mm 16mm 10mm;
+            }
+        }
+        .rupee {
+            font-family: 'Inter', 'Noto Sans', 'Arial', sans-serif;
+            font-weight: 700;
+            font-size: 1em;
+        }
+        .back-btn {
+            position: absolute;
+            top: 22px;
+            left: 22px;
+            background: linear-gradient(90deg, #06b6d4 0%, #4f46e5 100%);
+            color: #fff;
+            border: none;
+            border-radius: 7px;
+            padding: 8px 20px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(79,70,229,0.10);
+            transition: background 0.2s, transform 0.2s;
+            z-index: 10;
+        }
+        .back-btn:hover {
+            background: linear-gradient(90deg, #4f46e5 0%, #06b6d4 100%);
+            transform: translateY(-2px) scale(1.03);
+        }
+        @media print {
+            .back-btn {
+                display: none !important;
+            }
+        }
+
+        
+    </style>
+</head>
+<body>
+    <button class="back-btn" onclick="window.history.back()">← Back</button>
+    <div class="invoice-container">
+        <hr>
+        <div class="company">
+            <strong>{{ company_name }}</strong><br>
+            {{ company_address }}<br>
+            <span>Phone:</span> {{ company_phone }}<br>
+            <span>Email:</span> {{ company_email }}<br>
+            <span>GST No:</span> {{ company_gst }}
+        </div>
+        <div class="invoice-title">
+            INVOICE
+            <div class="invoice-number ">
+                {{ invoice_no }}
+            </div>
+        </div>
+        <hr>
+        <div class="customer">
+            <strong>Bill To:</strong><br>
+            {{ customer_name }}<br>
+            {{ customer_address }}<br>
+            <span>Phone:</span> {{ customer_phone }}<br>
+            <span>Email:</span> {{ customer_email }}<br>
+            <span>GST No:</span> {{ customer_gst }}
+        </div>
+        <div class="invoice-info">
+            <strong>Invoice No:</strong> {{ invoice_no }}<br>
+            <strong>Date:</strong> {{ invoice_date }}<br>
+            <span class="status">{{ payment_status }}</span>
+        </div>
+        <button class="print-btn" onclick="window.print()">🖨️ Print Invoice</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>S.No.</th>
+                    <th>Book Name</th>
+                    <th>Author</th>
+                    <th>Qty</th>
+                    <th>Rate</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ item.book_name }}</td>
+                    <td>{{ item.author }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td><span class="rupee">&#8377;</span> {{ item.price_per_unit }}</td>
+                    <td><span class="rupee">&#8377;</span> {{ item.total_price }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <table class="totals">
+            <tr>
+                <td>Subtotal:</td>
+                <td class="amount"><span class="rupee">&#8377;</span> {{ subtotal }}</td>
+            </tr>
+            <tr>
+                <td>Discount:</td>
+                <td class="amount"><span class="rupee">&#8377;</span> {{ discount }}</td>
+            </tr>
+            <tr>
+                <td>Tax:</td>
+                <td class="amount"><span class="rupee">&#8377;</span> {{ tax_amount }}</td>
+            </tr>
+            <tr>
+                <th>Total:</th>
+                <th class="amount"><span class="rupee">&#8377;</span> {{ final_amount }}</th>
+            </tr>
+        </table>
+        <div style="clear: both;"></div>
+        <div class="footer">
+            <p><strong>Notes:</strong> {{ notes }}</p>
+            <p>Thank you for your business!</p>
+        </div>
+        <div style="margin-top:40px; display: flex; justify-content: space-between; align-items: flex-end;">
+            <div style="text-align:center;">
+                <div style="height:50px;"></div>
+                <div style="border-top:1px solid #888; width:180px; margin:0 auto 4px auto;"></div>
+                <div style="font-size:1em; color:#374151;">प्राप्तकर्ता (Recipient)</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="height:50px;"></div>
+                <div style="border-top:1px solid #888; width:220px; margin:0 auto 4px auto;"></div>
+                <div style="font-size:1em; color:#374151;">साहित्य विस्तार पटल प्रभारी</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

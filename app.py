@@ -1,6 +1,24 @@
+import subprocess
+import os
+import atexit
+
+# Start the Flask server in the background
+flask_process = subprocess.Popen(
+    ['python', 'serve_invoice.py'],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE
+)
+
+# Ensure Flask server is terminated when Streamlit exits
+def cleanup():
+    flask_process.terminate()
+atexit.register(cleanup)
+
 import streamlit as st
 import sys
 import os
+
+from flask import Flask, render_template, request
 
 # Add the current directory to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -19,7 +37,8 @@ st.set_page_config(
 # Initialize database
 @st.cache_resource
 def init_database():
-    db = DatabaseManager()
+    conn_str = "postgresql://neondb_owner:npg_R81aBEUPvtMC@ep-fragrant-tooth-a1j6h75o-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+    db = DatabaseManager(conn_str)
     db.create_tables()
     return db
 
@@ -74,6 +93,7 @@ st.markdown("""
 <div class="main-header">
     <h1>📚 Premium Book Inventory & Billing System</h1>
     <p>Professional Multi-Company Book Management Solution</p>
+    <p>Created and developed by Divy Mohan (Vedmata Web Designing)</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -127,6 +147,18 @@ if companies:
 
 else:
     st.info("👋 Welcome! Please start by adding your first company in the Companies section.")
+
+# Flask app for invoice generation
+app = Flask(__name__)
+
+# @app.route('/invoice.html')
+# def invoice():
+#     invoice_id = request.args.get('invoice_id')
+#     # Fetch invoice data from your database using invoice_id
+#     # Example:
+#     # invoice_data = db.get_invoice_by_id(invoice_id)
+#     # return render_template('invoice.html', **invoice_data)
+#     return render_template('invoice.html', invoice_id=invoice_id)
 
 # Footer
 st.markdown("---")

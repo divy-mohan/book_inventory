@@ -16,19 +16,52 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize database
+from database.db_manager import DatabaseManager
+import streamlit as st
+
 @st.cache_resource
 def get_database():
-    return DatabaseManager()
+    conn_str = "postgresql://neondb_owner:npg_R81aBEUPvtMC@ep-fragrant-tooth-a1j6h75o-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+    return DatabaseManager(conn_str)
 
 db = get_database()
+# ...rest of your page code...
 
-# Page header
-st.markdown("""
-<div style="background: linear-gradient(90deg, #1f77b4 0%, #2e86de 100%); 
-            padding: 2rem; border-radius: 10px; margin-bottom: 2rem; text-align: center; color: white;">
-    <h1>🛒 Purchase Management</h1>
-    <p>Record book purchases and manage inventory procurement</p>
+import streamlit as st
+import base64
+
+# 📌 Load and encode logo image
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+img_data = get_base64_image("static/images/logo.png")
+
+# 📌 Render Gradient Banner with Logo and Title
+st.markdown(f"""
+<div style="
+    background: linear-gradient(90deg, #ffe600 0%, #ff9100 60%, #ff0000 100%);
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    color: white;
+    display: flex;
+    align-items: center;
+">
+    <div style="flex: 1;">
+        <img src="data:image/png;base64,{img_data}" width="80" style="border-radius: 5px;" />
+    </div>
+    <div style="flex: 6; text-align: center;">
+        <h1 style="
+            font-size: 6rem;
+            font-weight: bold;
+            font-family: 'Adobe Devanagari', 'Noto Sans Devanagari', sans-serif;
+            margin: 0;
+        ">प्रान्तीय युवा प्रकोष्ठ - सुल्तानपुर</h1>
+        <p style="margin: 0; font-size: 2rem; font-family: 'Adobe Devanagari', 'Noto Sans Devanagari', 'Mangal', Arial, sans-serif;">
+            पुस्तक स्टॉक व बिक्री रिपोर्ट डैशबोर्ड
+        </p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -162,73 +195,144 @@ elif action == "Add New Purchase":
             st.switch_page("pages/3_📚_Books.py")
         st.stop()
     
-    with st.form("add_purchase_form"):
-        st.markdown("#### Purchase Information")
-        
-        # Book selection
-        book_options = {f"{book['name']} - {book.get('author', 'Unknown')} ({book.get('company_name', 'N/A')})": book['id'] for book in books}
-        selected_book_key = st.selectbox("Select Book *", list(book_options.keys()))
-        book_id = book_options[selected_book_key]
-        
-        # Get selected book details
-        selected_book = next(book for book in books if book['id'] == book_id)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            supplier_name = st.text_input("Supplier Name", placeholder="Enter supplier/vendor name")
-            quantity = st.number_input("Quantity *", min_value=1, value=1, step=1)
-            price_per_unit = st.number_input("Price per Unit (₹) *", min_value=0.01, value=float(selected_book.get('purchase_price', 0)), step=0.01)
-        
-        with col2:
-            purchase_date = st.date_input("Purchase Date", value=date.today())
-            total_amount = quantity * price_per_unit
-            st.write(f"**Total Amount:** {format_currency(total_amount)}")
-            
-            # Show current stock
-            st.info(f"📦 Current Stock: {selected_book.get('stock_quantity', 0)}")
-        
-        notes = st.text_area("Notes", placeholder="Additional notes about this purchase")
-        
-        submitted = st.form_submit_button("🛒 Record Purchase", use_container_width=True)
-        
-        if submitted:
-            # Validation
-            errors = []
-            
-            if quantity <= 0:
-                errors.append("Quantity must be greater than 0")
-            
-            if price_per_unit <= 0:
-                errors.append("Price per unit must be greater than 0")
-            
-            if errors:
-                for error in errors:
-                    show_error(error)
-            else:
-                # Create purchase record
-                purchase_data = {
-                    'company_id': selected_book['company_id'],
-                    'book_id': book_id,
-                    'supplier_name': supplier_name.strip(),
-                    'quantity': quantity,
-                    'price_per_unit': price_per_unit,
-                    'total_amount': total_amount,
-                    'purchase_date': purchase_date,
-                    'notes': notes.strip()
-                }
-                
-                # Add to database
-                if db.add_purchase(purchase_data):
-                    show_success(f"Purchase recorded successfully! Stock updated for '{selected_book['name']}'")
-                    st.balloons()
-                    
-                    # Show updated stock information
-                    updated_book = db.get_book_by_id(book_id)
-                    st.info(f"📈 Stock updated: {selected_book.get('stock_quantity', 0)} → {updated_book.get('stock_quantity', 0)}")
+    # --- FILTERS START HERE ---
+    col1, col2, col3 = st.columns([3, 1, 1])
+    
+    with col1:
+        search_term = st.text_input("🔍 Search books...", placeholder="Enter book name, author, category, or ISBN")
+    
+    with col2:
+        language_filter = st.selectbox("Language", ["All"] + sorted(list(set(book.get('language', 'English') for book in books))))
+    
+    with col3:
+        category_filter = st.selectbox("Category", ["All"] + sorted(list(set(book.get('category', 'Uncategorized') for book in books))))
+    
+    # Apply filters
+    filtered_books = books
+    
+    if search_term:
+        filtered_books = filter_data(filtered_books, search_term, ['name', 'author', 'category', 'isbn'])
+    
+    if language_filter != "All":
+        filtered_books = [book for book in filtered_books if book.get('language', 'English') == language_filter]
+    
+    if category_filter != "All":
+        filtered_books = [book for book in filtered_books if book.get('category', 'Uncategorized') == category_filter]
+    
+    # Display books count
+    st.write(f"📊 Showing **{len(filtered_books)}** of **{len(books)}** books")
+    # --- FILTERS END HERE ---
+
+    if not filtered_books:
+        st.warning("No books match your search.")
+        st.stop()
+
+    st.markdown("#### Select a Book")
+
+    if "selected_book_id" not in st.session_state:
+        st.session_state.selected_book_id = None
+
+    books_per_row = 5
+
+    for row_idx, i in enumerate(range(0, len(filtered_books), books_per_row)):
+        cols = st.columns(books_per_row)
+        bg_color = "#fffbe6" if row_idx % 2 == 0 else "#f0f4ff"
+        for j, book in enumerate(filtered_books[i:i+books_per_row]):
+            with cols[j]:
+                is_selected = st.session_state.selected_book_id == book['id']
+                border = "2px solid #ff9100" if is_selected else "1px solid #ddd"
+                card_html = f"""
+                <div style="
+                    border:{border};
+                    border-radius:10px;
+                    padding:12px 8px 8px 8px;
+                    margin-bottom:10px;
+                    background:{bg_color};
+                    box-shadow:0 2px 8px rgba(0,0,0,0.04);
+                    text-align:center;
+                    min-height:90px;
+                    position:relative;
+                ">
+                    <div style="font-weight:bold;font-size:1.08em;color:#d2691e;">{book['name']}</div>
+                    <div style="font-size:0.95em;color:#888;">{book.get('author','')}</div>
+                    <div style="font-size:0.85em;color:#666;margin-bottom:6px;">{book.get('category','')}</div>
+                    <div style="font-size:0.85em;color:#444;margin-bottom:4px;"><b>Book Code:</b> {book.get('isbn','')}</div>
+                </div>
+                """
+                st.markdown(card_html, unsafe_allow_html=True)
+                if st.button("Selected" if is_selected else "Select", key=f"select_book_{book['id']}", use_container_width=True):
+                    st.session_state.selected_book_id = book['id']
                     st.rerun()
-                else:
-                    show_error("Failed to record purchase. Please try again.")
+
+    if not st.session_state.selected_book_id:
+        st.info("Please select a book above to record a purchase.")
+        st.stop()
+
+    selected_book = next(book for book in books if book['id'] == st.session_state.selected_book_id)
+
+    st.success(f"Selected Book: **{selected_book['name']}** by {selected_book.get('author','')}")
+
+    # --- FORM STARTS HERE ---
+    col1, col2 = st.columns(2)
+
+    with col1:
+        supplier_name = st.text_input("Supplier Name", placeholder="Enter supplier/vendor name")
+        quantity = st.number_input("Quantity *", min_value=1, value=1, step=1)
+        default_price = float(selected_book.get('purchase_price', 0.01))
+        if default_price < 0.01:
+            default_price = 0.01
+
+        price_per_unit = st.number_input(
+            "Price per Unit (₹) *",
+            min_value=0.01,
+            value=default_price,
+            step=0.01
+        )
+
+    with col2:
+        purchase_date = st.date_input("Purchase Date", value=date.today())
+        total_amount = quantity * price_per_unit
+        st.write(f"**Total Amount:** {format_currency(total_amount)}")
+
+    notes = st.text_area("Notes", placeholder="Additional notes about this purchase")
+        
+    if st.button("🛒 Record Purchase", use_container_width=True):
+        # Validation
+        errors = []
+        
+        if quantity <= 0:
+            errors.append("Quantity must be greater than 0")
+        
+        if price_per_unit <= 0:
+            errors.append("Price per unit must be greater than 0")
+        
+        if errors:
+            for error in errors:
+                show_error(error)
+        else:
+            # Create purchase record
+            purchase_data = {
+                'company_id': selected_book['company_id'],
+                'book_id': selected_book['id'], 
+                'supplier_name': supplier_name.strip(),
+                'quantity': quantity,
+                'price_per_unit': price_per_unit,
+                'total_amount': total_amount,
+                'purchase_date': purchase_date,
+                'notes': notes.strip()
+            }
+            
+            # Add to database
+            if db.add_purchase(purchase_data):
+                show_success(f"Purchase recorded successfully! Stock updated for '{selected_book['name']}'")
+                st.balloons()
+                
+                # Show updated stock information
+                updated_book = db.get_book_by_id(selected_book['id'])
+                st.info(f"📈 Stock updated: {selected_book.get('stock_quantity', 0)} → {updated_book.get('stock_quantity', 0)}")
+                st.rerun()
+            else:
+                show_error("Failed to record purchase. Please try again.")
 
 elif action == "Purchase History":
     st.markdown("### 📊 Purchase Analytics")
@@ -247,13 +351,28 @@ elif action == "Purchase History":
     
     if all_purchases:
         st.markdown(f"#### Purchase Analysis for {analysis_title}")
-        
-        # Summary metrics
-        total_purchases = len(all_purchases)
-        total_amount = sum(purchase['total_amount'] for purchase in all_purchases)
-        total_quantity = sum(purchase['quantity'] for purchase in all_purchases)
-        unique_books = len(set(purchase['book_id'] for purchase in all_purchases))
-        unique_suppliers = len(set(purchase.get('supplier_name', 'Unknown') for purchase in all_purchases if purchase.get('supplier_name')))
+
+        # Add search box for purchases
+        purchase_search = st.text_input("🔍 Search purchases for analytics...", placeholder="Enter book name, author, or supplier")
+        filtered_purchases = all_purchases
+        if purchase_search:
+            purchase_search_lower = purchase_search.lower()
+            filtered_purchases = [
+                purchase for purchase in all_purchases
+                if purchase_search_lower in purchase.get('book_name', '').lower()
+                or purchase_search_lower in purchase.get('author', '').lower()
+                or purchase_search_lower in purchase.get('supplier_name', '').lower()
+            ]
+        else:
+            filtered_purchases = all_purchases
+
+        # Use filtered_purchases for all analytics below instead of all_purchases
+        # For example:
+        total_purchases = len(filtered_purchases)
+        total_amount = sum(purchase['total_amount'] for purchase in filtered_purchases)
+        total_quantity = sum(purchase['quantity'] for purchase in filtered_purchases)
+        unique_books = len(set(purchase['book_id'] for purchase in filtered_purchases))
+        unique_suppliers = len(set(purchase.get('supplier_name', 'Unknown') for purchase in filtered_purchases if purchase.get('supplier_name')))
         
         col1, col2, col3, col4, col5 = st.columns(5)
         
@@ -282,7 +401,7 @@ elif action == "Purchase History":
             
             # Create monthly summary
             monthly_data = {}
-            for purchase in all_purchases:
+            for purchase in filtered_purchases:
                 if purchase.get('purchase_date'):
                     try:
                         purchase_date = datetime.strptime(str(purchase['purchase_date']), '%Y-%m-%d')
@@ -311,7 +430,7 @@ elif action == "Purchase History":
             
             # Supplier analysis
             supplier_data = {}
-            for purchase in all_purchases:
+            for purchase in filtered_purchases:
                 supplier = purchase.get('supplier_name', 'Unknown')
                 if supplier not in supplier_data:
                     supplier_data[supplier] = {'amount': 0, 'quantity': 0, 'count': 0}
@@ -343,7 +462,7 @@ elif action == "Purchase History":
         st.markdown("#### 📚 Most Purchased Books")
         
         book_purchases = {}
-        for purchase in all_purchases:
+        for purchase in filtered_purchases:
             book_key = f"{purchase['book_name']} - {purchase.get('author', 'Unknown')}"
             if book_key not in book_purchases:
                 book_purchases[book_key] = {'amount': 0, 'quantity': 0, 'count': 0}
@@ -396,7 +515,7 @@ elif action == "Purchase History":
         with col2:
             if st.button("📋 Export Detailed Records", use_container_width=True):
                 detailed_data = []
-                for purchase in all_purchases:
+                for purchase in filtered_purchases:
                     detailed_data.append({
                         'Date': purchase.get('purchase_date', ''),
                         'Book Name': purchase['book_name'],

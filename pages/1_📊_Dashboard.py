@@ -18,21 +18,54 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize database
+from database.db_manager import DatabaseManager
+import streamlit as st
+
 @st.cache_resource
 def get_database():
-    return DatabaseManager()
+    conn_str = "postgresql://neondb_owner:npg_R81aBEUPvtMC@ep-fragrant-tooth-a1j6h75o-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+    return DatabaseManager(conn_str)
 
 db = get_database()
+# ...rest of your page code...
 
-# Page header
-st.markdown("""
-<div style="background: linear-gradient(90deg, #1f77b4 0%, #2e86de 100%); 
-            padding: 2rem; border-radius: 10px; margin-bottom: 2rem; text-align: center; color: white;">
-    <h1>📊 Business Dashboard</h1>
-    <p>Real-time insights into your book inventory and sales performance</p>
+import streamlit as st
+import base64
+
+# 📌 Load and encode logo image
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+img_data = get_base64_image("static/images/logo.png")
+
+st.markdown(f"""
+<div style="
+    background: linear-gradient(90deg, #ffe600 0%, #ff9100 60%, #ff0000 100%);
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    color: white;
+    display: flex;
+    align-items: center;
+">
+    <div style="flex: 1;">
+        <img src="data:image/png;base64,{img_data}" width="80" style="border-radius: 5px;" />
+    </div>
+    <div style="flex: 6; text-align: center;">
+        <h1 style="
+            font-size: 6rem;
+            font-weight: bold;
+            font-family: 'Adobe Devanagari', 'Noto Sans Devanagari', sans-serif;
+            margin: 0;
+        ">प्रान्तीय युवा प्रकोष्ठ - सुल्तानपुर</h1>
+        <p style="margin: 0; font-size: 2rem; font-family: 'Adobe Devanagari', 'Noto Sans Devanagari', 'Mangal', Arial, sans-serif;">
+            पुस्तक स्टॉक व बिक्री रिपोर्ट डैशबोर्ड
+        </p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
+
 
 # Get dashboard metrics
 metrics = generate_dashboard_metrics(db)
@@ -283,3 +316,4 @@ st.markdown("""
     <p>Dashboard updated: {}</p>
 </div>
 """.format(datetime.now().strftime("%d/%m/%Y %H:%M:%S")), unsafe_allow_html=True)
+

@@ -16,12 +16,16 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize database
+from database.db_manager import DatabaseManager
+import streamlit as st
+
 @st.cache_resource
 def get_database():
-    return DatabaseManager()
+    conn_str = "postgresql://neondb_owner:npg_R81aBEUPvtMC@ep-fragrant-tooth-a1j6h75o-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+    return DatabaseManager(conn_str)
 
 db = get_database()
+# ...rest of your page code...
 
 # Initialize PDF generator
 @st.cache_resource
@@ -30,12 +34,40 @@ def get_pdf_generator():
 
 pdf_generator = get_pdf_generator()
 
-# Page header
-st.markdown("""
-<div style="background: linear-gradient(90deg, #1f77b4 0%, #2e86de 100%); 
-            padding: 2rem; border-radius: 10px; margin-bottom: 2rem; text-align: center; color: white;">
-    <h1>📄 Professional Billing & Invoicing</h1>
-    <p>Generate branded PDF invoices and manage billing operations</p>
+import streamlit as st
+import base64
+
+# 📌 Load and encode logo image
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+img_data = get_base64_image("static/images/logo.png")
+
+st.markdown(f"""
+<div style="
+    background: linear-gradient(90deg, #ffe600 0%, #ff9100 60%, #ff0000 100%);
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    color: white;
+    display: flex;
+    align-items: center;
+">
+    <div style="flex: 1;">
+        <img src="data:image/png;base64,{img_data}" width="80" style="border-radius: 5px;" />
+    </div>
+    <div style="flex: 6; text-align: center;">
+        <h1 style="
+            font-size: 6rem;
+            font-weight: bold;
+            font-family: 'Adobe Devanagari', 'Noto Sans Devanagari', sans-serif;
+            margin: 0;
+        ">प्रान्तीय युवा प्रकोष्ठ - सुल्तानपुर</h1>
+        <p style="margin: 0; font-size: 2rem; font-family: 'Adobe Devanagari', 'Noto Sans Devanagari', 'Mangal', Arial, sans-serif;">
+            पुस्तक स्टॉक व बिक्री रिपोर्ट डैशबोर्ड
+        </p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -226,43 +258,43 @@ if action == "Generate Invoice":
             st.markdown(f"**Notes:** {sale['notes']}")
     
     # Generate PDF button
-    st.markdown("---")
+    # st.markdown("---")
     
-    col1, col2 = st.columns(2)
+    # col1, col2 = st.columns(2)
     
-    with col1:
-        if st.button("📄 Generate PDF Invoice", type="primary", use_container_width=True):
-            try:
-                # Prepare invoice data
-                invoice_data = {
-                    'sale': sale,
-                    'items': items,
-                    'company': company,
-                    'customer': customer
-                }
+    # with col1:
+    #     if st.button("📄 Generate PDF Invoice", type="primary", use_container_width=True):
+    #         try:
+    #             # Prepare invoice data
+    #             invoice_data = {
+    #                 'sale': sale,
+    #                 'items': items,
+    #                 'company': company,
+    #                 'customer': customer
+    #             }
                 
-                # Generate PDF
-                pdf_filename = pdf_generator.generate_invoice(invoice_data)
+    #             # Generate PDF
+    #             pdf_filename = pdf_generator.generate_invoice(invoice_data)
                 
-                if pdf_filename and os.path.exists(pdf_filename):
-                    show_success(f"Invoice PDF generated successfully!")
+    #             if pdf_filename and os.path.exists(pdf_filename):
+    #                 show_success(f"Invoice PDF generated successfully!")
                     
-                    # Provide download link
-                    if create_download_link(pdf_filename, f"invoice_{sale['invoice_no']}.pdf"):
-                        st.success("📥 PDF ready for download!")
-                else:
-                    show_error("Failed to generate PDF invoice.")
+    #                 # Provide download link
+    #                 if create_download_link(pdf_filename, f"invoice_{sale['invoice_no']}.pdf"):
+    #                     st.success("📥 PDF ready for download!")
+    #             else:
+    #                 show_error("Failed to generate PDF invoice.")
             
-            except Exception as e:
-                show_error(f"Error generating invoice: {str(e)}")
+    #         except Exception as e:
+    #             show_error(f"Error generating invoice: {str(e)}")
     
-    with col2:
-        if st.button("📧 Email Invoice", use_container_width=True):
-            if customer and customer.get('email'):
-                st.info("📧 Email functionality coming soon!")
-                # Here you would implement email sending functionality
-            else:
-                st.warning("⚠️ Customer email not available for this sale.")
+    # with col2:
+    #     if st.button("📧 Email Invoice", use_container_width=True):
+    #         if customer and customer.get('email'):
+    #             st.info("📧 Email functionality coming soon!")
+    #             # Here you would implement email sending functionality
+    #         else:
+    #             st.warning("⚠️ Customer email not available for this sale.")
 
 elif action == "View Invoices":
     st.markdown("### 📋 Invoice History")
@@ -345,28 +377,28 @@ elif action == "View Invoices":
                 use_container_width=True
             )
             
-            # Action buttons for selected invoices
-            st.markdown("#### 🔧 Invoice Actions")
+            # # Action buttons for selected invoices
+            # st.markdown("#### 🔧 Invoice Actions")
             
-            col1, col2, col3 = st.columns(3)
+            # col1, col2, col3 = st.columns(3)
             
-            with col1:
-                selected_invoice = st.selectbox(
-                    "Select Invoice for Action",
-                    [f"{sale['invoice_no']} - {sale.get('customer_name', 'Walk-in')}" for sale in filtered_sales]
-                )
+            # with col1:
+            #     selected_invoice = st.selectbox(
+            #         "Select Invoice for Action",
+            #         [f"{sale['invoice_no']} - {sale.get('customer_name', 'Walk-in')}" for sale in filtered_sales]
+            #     )
                 
-                if selected_invoice:
-                    selected_sale = next(sale for sale in filtered_sales if f"{sale['invoice_no']} - {sale.get('customer_name', 'Walk-in')}" == selected_invoice)
+            #     if selected_invoice:
+            #         selected_sale = next(sale for sale in filtered_sales if f"{sale['invoice_no']} - {sale.get('customer_name', 'Walk-in')}" == selected_invoice)
             
-            with col2:
-                if st.button("📄 View/Download PDF", use_container_width=True):
-                    st.session_state.view_sale_id = selected_sale['id']
-                    st.rerun()
+            # with col2:
+            #     if st.button("📄 View/Download PDF", use_container_width=True):
+            #         st.session_state.view_sale_id = selected_sale['id']
+            #         st.rerun()
             
-            with col3:
-                if st.button("📧 Resend Invoice", use_container_width=True):
-                    st.info("📧 Email functionality coming soon!")
+            # with col3:
+            #     if st.button("📧 Resend Invoice", use_container_width=True):
+            #         st.info("📧 Email functionality coming soon!")
         else:
             st.info("No invoices match your search criteria.")
     else:
@@ -523,3 +555,17 @@ if all_sales:
         st.metric("⏳ Pending Invoices", pending_invoices)
 else:
     st.info("Create sales to see billing statistics.")
+
+invoice_id = sale['invoice_no']  # or whatever uniquely identifies the invoice
+invoice_url = f"http://127.0.0.1:5001/invoice.html?invoice_id={invoice_id}"
+
+if st.button("🌐 Go to Invoice Webpage", use_container_width=True):
+    st.markdown(
+        f"""
+        <meta http-equiv="refresh" content="0; url='{invoice_url}'" />
+        <script>
+            window.location.href = "{invoice_url}";
+        </script>
+        """,
+        unsafe_allow_html=True
+    )

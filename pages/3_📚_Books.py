@@ -19,16 +19,45 @@ st.set_page_config(
 # Initialize database
 @st.cache_resource
 def get_database():
-    return DatabaseManager()
+    conn_str = "postgresql://neondb_owner:npg_R81aBEUPvtMC@ep-fragrant-tooth-a1j6h75o-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+    return DatabaseManager(conn_str)
 
 db = get_database()
 
-# Page header
-st.markdown("""
-<div style="background: linear-gradient(90deg, #1f77b4 0%, #2e86de 100%); 
-            padding: 2rem; border-radius: 10px; margin-bottom: 2rem; text-align: center; color: white;">
-    <h1>📚 Book Inventory Management</h1>
-    <p>Manage your complete book collection with Hindi/English support</p>
+import streamlit as st
+import base64
+
+# 📌 Load and encode logo image
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+img_data = get_base64_image("static/images/logo.png")
+
+st.markdown(f"""
+<div style="
+    background: linear-gradient(90deg, #ffe600 0%, #ff9100 60%, #ff0000 100%);
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    color: white;
+    display: flex;
+    align-items: center;
+">
+    <div style="flex: 1;">
+        <img src="data:image/png;base64,{img_data}" width="80" style="border-radius: 5px;" />
+    </div>
+    <div style="flex: 6; text-align: center;">
+        <h1 style="
+            font-size: 6rem;
+            font-weight: bold;
+            font-family: 'Adobe Devanagari', 'Noto Sans Devanagari', sans-serif;
+            margin: 0;
+        ">प्रान्तीय युवा प्रकोष्ठ - सुल्तानपुर</h1>
+        <p style="margin: 0; font-size: 2rem; font-family: 'Adobe Devanagari', 'Noto Sans Devanagari', 'Mangal', Arial, sans-serif;">
+            पुस्तक स्टॉक व बिक्री रिपोर्ट डैशबोर्ड
+        </p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -67,6 +96,19 @@ if action == "View Books":
         books = db.get_books_by_company(selected_company['id'])
     
     if books:
+        # --- Add this block before the search/filter UI ---
+        df = pd.DataFrame(books)
+        csv = df.to_csv(index=False, encoding='utf-8-sig')  # Use utf-8-sig for Excel compatibility
+
+        st.download_button(
+            label="⬇️ Download Inventory as CSV",
+            data=csv,
+            file_name="book_inventory.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        # --- End block ---
+
         # Search and filter options
         col1, col2, col3 = st.columns([3, 1, 1])
         
@@ -96,43 +138,68 @@ if action == "View Books":
         
         if filtered_books:
             # Pagination
-            page_data, current_page, total_pages = paginate_data(filtered_books, 10)
+            page_data, current_page, total_pages = paginate_data(filtered_books, 30)
             
-            # Display books in a table format
-            for book in page_data:
-                with st.expander(f"📖 {book['name']} - {book.get('author', 'Unknown Author')}", expanded=False):
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.write(f"**Company:** {book.get('company_name', 'N/A')}")
-                        st.write(f"**Category:** {book.get('category', 'Uncategorized')}")
-                        st.write(f"**Language:** {book.get('language', 'English')}")
-                        st.write(f"**ISBN:** {book.get('isbn', 'N/A')}")
-                    
-                    with col2:
-                        st.write(f"**Purchase Price:** {format_currency(book.get('purchase_price', 0))}")
-                        st.write(f"**Selling Price:** {format_currency(book.get('selling_price', 0))}")
-                        st.write(f"**Profit per Unit:** {format_currency(book.get('selling_price', 0) - book.get('purchase_price', 0))}")
-                    
-                    with col3:
-                        stock_qty = book.get('stock_quantity', 0)
-                        damaged_qty = book.get('damaged_quantity', 0)
-                        lost_qty = book.get('lost_quantity', 0)
-                        available_stock = stock_qty - damaged_qty - lost_qty
-                        
-                        # Color code stock levels
-                        if available_stock <= 5:
-                            stock_color = "🔴"
-                        elif available_stock <= 20:
-                            stock_color = "🟡"
-                        else:
-                            stock_color = "🟢"
-                        
-                        st.write(f"**Total Stock:** {stock_qty}")
-                        st.write(f"**Available Stock:** {stock_color} {available_stock}")
-                        st.write(f"**Damaged:** {damaged_qty}")
-                        st.write(f"**Lost:** {lost_qty}")
-                        st.write(f"**Stock Value:** {format_currency(available_stock * book.get('selling_price', 0))}")
+            # Display books in a beautiful 3-column card layout
+            cols = st.columns(3, gap="large")  # Equal size columns
+
+            # Add custom CSS for hover effect
+            st.markdown("""
+            <style>
+            .book-card {
+                transition: box-shadow 0.2s, border-right 0.2s;
+            }
+            .book-card:hover {
+                box-shadow: 0 6px 24px 0 rgba(255,145,0,0.18), 0 2px 8px 0 rgba(44,62,80,0.12);
+                border-right: 6px solid #ff9100;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
+            for idx, book in enumerate(page_data):
+                with cols[idx % 3]:
+                    st.markdown(f"""
+                    <div class="book-card" style="
+                        background: linear-gradient(120deg, #fffbe7 60%, #ffe600 100%);
+                        border-radius: 18px;
+                        box-shadow: 0 4px 18px 0 rgba(255,145,0,0.10), 0 1.5px 6px 0 rgba(44,62,80,0.08);
+                        padding: 1.2rem 1.5rem 1.2rem 1.5rem;
+                        margin-bottom: 1.5rem;
+                        min-height: 220px;
+                        position: relative;
+                        border-right: 0px solid #ff9100;
+                    ">
+                        <div style="display: flex; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <h3 style="margin:0; color:#d2691e; font-family:'Adobe Devanagari','Noto Sans Devanagari',sans-serif;">
+                                    {book['name']}
+                                </h3>
+                                <div style="color:#444; font-size:1.1rem; margin-bottom:0.3rem;">
+                                    <b>लेखक:</b> {book.get('author', 'N/A')}
+                                </div>
+                                <div style="color:#444; font-size:1.05rem;">
+                                    <b>श्रेणी:</b> {book.get('category', 'Uncategorized')}
+                                    &nbsp;|&nbsp;
+                                    <b>भाषा:</b> {book.get('language', 'English')}
+                                </div>
+                                <div style="color:#444; font-size:1.05rem;">
+                                    <b>ISBN:</b> {book.get('isbn', 'N/A')}
+                                </div>
+                                <div style="color:#444; font-size:1.05rem;">
+                                    <b>कंपनी:</b> {book.get('company_name', 'N/A')}
+                                </div>
+                            </div>
+                            <div style="flex: 0 0 120px; text-align:right;">
+                                <div style="background:#ff9100; color:#fff; border-radius:8px; padding:0.5rem 1rem; font-size:1.1rem; font-weight:bold; margin-bottom:0.5rem;">
+                                  Sell ₹ {book.get('selling_price', 0):,.2f}
+                                </div>
+                                <div style="background:#ffe600; color:#d2691e; border-radius:8px; padding:0.3rem 0.8rem; font-size:1rem; font-weight:bold;">
+                                    स्टॉक: {book.get('stock_quantity', 0)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
         else:
             st.info("No books match your search criteria.")
     else:
@@ -155,7 +222,7 @@ elif action == "Add New Book":
             book_name = st.text_input("Book Name *", placeholder="Enter book title")
             author = st.text_input("Author", placeholder="Author name")
             category = st.text_input("Category", placeholder="Fiction, Non-Fiction, Educational, etc.")
-            language = st.selectbox("Language", ["English", "Hindi", "Other"])
+            language = st.selectbox("Language", ["English", "Hindi", "Other"], index=1)
         
         with col2:
             isbn = st.text_input("ISBN", placeholder="ISBN number")
@@ -209,6 +276,7 @@ elif action == "Add New Book":
 elif action == "Edit Book":
     st.markdown("### ✏️ Edit Book")
     
+    
     # Get books for selection
     if company_filter == "All Companies":
         books = db.get_all_books()
@@ -217,6 +285,21 @@ elif action == "Edit Book":
         books = db.get_books_by_company(selected_company['id'])
     
     if books:
+                # --- Add search/filter box here ---
+        search_term = st.text_input("🔍 Search books to edit...", placeholder="Enter book name, author, category, or ISBN")
+        if search_term:
+            books = [
+                book for book in books
+                if search_term.lower() in str(book.get('isbn', '')).lower()
+                or search_term.lower() in str(book.get('name', '')).lower()
+                or search_term.lower() in str(book.get('author', '')).lower()
+                or search_term.lower() in str(book.get('category', '')).lower()
+            ]
+        # --- End search/filter box ---
+
+        if not books:
+            st.info("No books match your search criteria.")
+            
         book_options = {f"{book['name']} - {book.get('author', 'Unknown')} (ID: {book['id']})": book['id'] for book in books}
         selected_book_key = st.selectbox("Select Book to Edit", list(book_options.keys()))
         
@@ -242,7 +325,7 @@ elif action == "Edit Book":
                         author = st.text_input("Author", value=book.get('author', ''))
                         category = st.text_input("Category", value=book.get('category', ''))
                         language = st.selectbox("Language", ["English", "Hindi", "Other"], 
-                                               index=["English", "Hindi", "Other"].index(book.get('language', 'English')))
+                                               index=["English", "Hindi", "Other"].index(book.get('language', 'Hindi')))
                     
                     with col2:
                         isbn = st.text_input("ISBN", value=book.get('isbn', ''))
@@ -308,6 +391,21 @@ elif action == "Update Stock":
         books = db.get_books_by_company(selected_company['id'])
     
     if books:
+                # --- Add search/filter box here ---
+        search_term = st.text_input("🔍 Search books to edit...", placeholder="Enter book name, author, category, or ISBN")
+        if search_term:
+            books = [
+                book for book in books
+                if search_term.lower() in str(book.get('isbn', '')).lower()
+                or search_term.lower() in str(book.get('name', '')).lower()
+                or search_term.lower() in str(book.get('author', '')).lower()
+                or search_term.lower() in str(book.get('category', '')).lower()
+            ]
+        # --- End search/filter box ---
+
+        if not books:
+            st.info("No books match your search criteria.")
+        
         book_options = {f"{book['name']} - {book.get('author', 'Unknown')} (Current: {book['stock_quantity']})": book['id'] for book in books}
         selected_book_key = st.selectbox("Select Book", list(book_options.keys()))
         
@@ -388,6 +486,21 @@ elif action == "Delete Book":
         books = db.get_books_by_company(selected_company['id'])
     
     if books:
+                # --- Add search/filter box here ---
+        search_term = st.text_input("🔍 Search books to edit...", placeholder="Enter book name, author, category, or ISBN")
+        if search_term:
+            books = [
+                book for book in books
+                if search_term.lower() in str(book.get('isbn', '')).lower()
+                or search_term.lower() in str(book.get('name', '')).lower()
+                or search_term.lower() in str(book.get('author', '')).lower()
+                or search_term.lower() in str(book.get('category', '')).lower()
+            ]
+        # --- End search/filter box ---
+
+        if not books:
+            st.info("No books match your search criteria.")
+            
         st.warning("⚠️ **Warning:** Deleting a book will permanently remove it from the system!")
         
         book_options = {f"{book['name']} - {book.get('author', 'Unknown')} (ID: {book['id']})": book['id'] for book in books}

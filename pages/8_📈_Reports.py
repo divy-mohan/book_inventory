@@ -5,6 +5,10 @@ import plotly.graph_objects as go
 from datetime import datetime, date, timedelta
 import sys
 import os
+import base64
+from googletrans import Translator
+from reportlab.pdfgen import canvas
+from io import StringIO, BytesIO
 
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,7 +17,7 @@ from database.db_manager import DatabaseManager
 from utils.pdf_generator import PDFInvoiceGenerator
 from utils.helpers import (
     format_currency, format_date, show_success, show_error,
-    calculate_stock_value, get_low_stock_books, export_to_csv
+    calculate_stock_value, get_low_stock_books, export_to_csv, create_download_link
 )
 
 st.set_page_config(
@@ -25,7 +29,8 @@ st.set_page_config(
 # Initialize database and PDF generator
 @st.cache_resource
 def get_database():
-    return DatabaseManager()
+    conn_str = "postgresql://neondb_owner:npg_R81aBEUPvtMC@ep-fragrant-tooth-a1j6h75o-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+    return DatabaseManager(conn_str)
 
 @st.cache_resource
 def get_pdf_generator():
@@ -35,11 +40,40 @@ db = get_database()
 pdf_generator = get_pdf_generator()
 
 # Page header
-st.markdown("""
-<div style="background: linear-gradient(90deg, #1f77b4 0%, #2e86de 100%); 
-            padding: 2rem; border-radius: 10px; margin-bottom: 2rem; text-align: center; color: white;">
-    <h1>📈 Business Reports & Analytics</h1>
-    <p>Comprehensive insights and detailed business reports</p>
+import streamlit as st
+import base64
+
+# 📌 Load and encode logo image
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+img_data = get_base64_image("static/images/logo.png")
+
+st.markdown(f"""
+<div style="
+    background: linear-gradient(90deg, #ffe600 0%, #ff9100 60%, #ff0000 100%);
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    color: white;
+    display: flex;
+    align-items: center;
+">
+    <div style="flex: 1;">
+        <img src="data:image/png;base64,{img_data}" width="80" style="border-radius: 5px;" />
+    </div>
+    <div style="flex: 6; text-align: center;">
+        <h1 style="
+            font-size: 6rem;
+            font-weight: bold;
+            font-family: 'Adobe Devanagari', 'Noto Sans Devanagari', sans-serif;
+            margin: 0;
+        ">प्रान्तीय युवा प्रकोष्ठ - सुल्तानपुर</h1>
+        <p style="margin: 0; font-size: 2rem; font-family: 'Adobe Devanagari', 'Noto Sans Devanagari', 'Mangal', Arial, sans-serif;">
+            पुस्तक स्टॉक व बिक्री रिपोर्ट डैशबोर्ड
+        </p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -749,67 +783,6 @@ elif report_type == "Financial Summary":
             fig.update_layout(title='Monthly Financial Performance', xaxis_title='Month', yaxis_title='Amount (₹)')
             st.plotly_chart(fig, use_container_width=True)
 
-# Export and PDF generation
-st.markdown("---")
-st.markdown("### 📥 Export Reports")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    if st.button("📊 Export to CSV", use_container_width=True):
-        # Prepare summary data based on current report
-        summary_data = {
-            'Report Type': report_type,
-            'Company': company_data['title'],
-            'Date Range': date_range,
-            'Generated On': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
-        
-        csv_data = export_to_csv([summary_data], f"{report_type.replace(' ', '_').lower()}_summary.csv")
-        st.download_button(
-            label="Download Summary CSV",
-            data=csv_data,
-            file_name=f"{report_type.replace(' ', '_').lower()}_summary.csv",
-            mime="text/csv"
-        )
-
-with col2:
-    if st.button("📄 Generate PDF Report", use_container_width=True):
-        try:
-            # Prepare report data for PDF
-            report_data = {
-                'title': f"{report_type} - {company_data['title']}",
-                'period': f"Period: {date_range}",
-                'company_name': company_data['title'],
-                'summary': {
-                    'Report Type': report_type,
-                    'Companies': len(company_data['companies']),
-                    'Books': len(company_data['books']),
-                    'Customers': len(company_data['customers']),
-                    'Sales': len(filtered_sales),
-                    'Generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                }
-            }
-            
-            # Generate PDF
-            pdf_filename = pdf_generator.generate_report_pdf(report_data)
-            
-            if pdf_filename and os.path.exists(pdf_filename):
-                show_success("PDF report generated successfully!")
-                
-                # Provide download link
-                if create_download_link(pdf_filename, f"{report_type.replace(' ', '_').lower()}_report.pdf"):
-                    st.success("📥 PDF ready for download!")
-            else:
-                show_error("Failed to generate PDF report.")
-        
-        except Exception as e:
-            show_error(f"Error generating PDF: {str(e)}")
-
-with col3:
-    if st.button("🔄 Refresh Data", use_container_width=True):
-        st.cache_resource.clear()
-        st.rerun()
 
 # Footer
 st.markdown("---")
@@ -819,3 +792,51 @@ st.markdown(f"""
     <p><strong>Data Range:</strong> {date_range} | <strong>Company:</strong> {company_data['title']}</p>
 </div>
 """, unsafe_allow_html=True)
+
+def create_download_link(file_path, link_text="Download PDF", prefix="report"):
+    with open(file_path, "rb") as f:
+        data = f.read()
+    b64 = base64.b64encode(data).decode()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{prefix}_{timestamp}.pdf"
+    href = (
+        f'<a href="data:application/pdf;base64,{b64}" '
+        f'download="{filename}" style="display:inline-block;'
+        f'padding:10px 24px;background:#4f46e5;color:#fff;'
+        f'border-radius:6px;text-decoration:none;font-weight:600;">'
+        f'{link_text}</a>'
+    )
+    return href
+
+def translate_report_data(report_data):
+    translator = Translator()
+    # Translate all string fields in report_data to English
+    for key, value in report_data.items():
+        if isinstance(value, str):
+            report_data[key] = translator.translate(value, dest='en').text
+        elif isinstance(value, dict):
+            for k, v in value.items():
+                if isinstance(v, str):
+                    value[k] = translator.translate(v, dest='en').text
+import pandas as pd
+from io import StringIO
+
+# Assuming company_data['books'] is a list of dicts
+books = company_data['books']
+
+import pandas as pd
+from io import BytesIO
+
+df = pd.DataFrame(books)  # books should be a list of dicts
+
+csv_buffer = BytesIO()
+df.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
+csv_buffer.seek(0)
+
+st.download_button(
+    label="⬇️ Download Inventory as CSV",
+    data=csv_buffer.getvalue(),
+    file_name="book_inventory.csv",
+    mime="text/csv",
+    use_container_width=True
+)
